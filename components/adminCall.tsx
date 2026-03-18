@@ -166,8 +166,8 @@ export const withDrawFunds = async (from: string, amount: number) => {
       )
       .send({
         from: account,
-        gas: 250000, // Manual gas limit to bypass estimation failure
-        gasPrice: gasPrice,
+        gas: "250000", // Manual gas limit to bypass estimation failure
+        gasPrice: gasPrice.toString(),
       });
     return tx;
   } catch (err) {
