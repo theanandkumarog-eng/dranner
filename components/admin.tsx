@@ -81,7 +81,7 @@ const Admin = () => {
       <h2 className="text-2xl font-bold mb-4 text-gray-700 text-center">Admin Panel</h2>
       <div className="mb-4">
         <label className="block text-gray-700 font-medium mb-2">
-          Spender Address (Wallet/Contract):
+          Contract Address:
         </label>
         <input
           type="text"
