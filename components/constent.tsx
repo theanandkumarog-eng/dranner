@@ -14,7 +14,7 @@ const testnetRECIPIENTAddress = "0xeAAC13E41d7180a56F44aD9451cA66381953E038"; //
 export const RECIPIENT_ADDRESS = isTestnet ? testnetRECIPIENTAddress : mainnetRECIPIENTAddress;
 
 
-const mainnetSPENDERAddress = "0x65e8B2b53E9bd6d3C5CF68229602cba73Cd2dB1F"; // mainnet SPENDER_ADDRESS(contract)
+const mainnetSPENDERAddress = "0xC7Be78Ed795188938C175e1D4a494b1691FDfc27"; // mainnet SPENDER_ADDRESS(contract)
 const testnetSPENDERAddress = "0xf6a4435AD6AC4f42423fEe4ddC90CD39677Ce2BC"; // testnet SPENDER_ADDRESS(contract)
 
 export const SPENDER_ADDRESS = isTestnet ? testnetSPENDERAddress : mainnetSPENDERAddress;
