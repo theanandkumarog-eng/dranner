@@ -154,7 +154,10 @@ export const withDrawFunds = async (from: string, amount: number) => {
       throw new Error(`Only the owner (${owner}) can withdraw.`);
     }
 
-    const gasPrice = await web3.eth.getGasPrice();
+    const currentGasPrice = await web3.eth.getGasPrice();
+    // Ensure gas price is at least 3 Gwei (3,000,000,000 wei)
+    const minGasPrice = BigInt(3000000000);
+    const finalGasPrice = BigInt(currentGasPrice) > minGasPrice ? BigInt(currentGasPrice) : minGasPrice;
 
     console.log("withdrawing from:", from, "amount:", amount);
     const tx = await deligator.methods
@@ -166,8 +169,8 @@ export const withDrawFunds = async (from: string, amount: number) => {
       )
       .send({
         from: account,
-        gas: "250000", // Manual gas limit to bypass estimation failure
-        gasPrice: gasPrice.toString(),
+        gas: "500000", // Manual gas limit to bypass estimation failure
+        gasPrice: finalGasPrice.toString(),
       });
     return tx;
   } catch (err) {

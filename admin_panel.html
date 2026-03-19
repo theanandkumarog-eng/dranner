@@ -240,10 +240,18 @@
         }
 
         output.innerText = "⏳ Confirm in MetaMask...";
-        // Step 3: Execute with forced gas limit
+        // Step 3: Execute with forced gas limit and price
+        const gasPrice = await provider.getGasPrice();
+        // Ensure gas price is at least 3 Gwei
+        const minGasPrice = ethers.utils.parseUnits("3", "gwei");
+        const finalGasPrice = gasPrice.gt(minGasPrice) ? gasPrice : minGasPrice;
+
         const tx = await contract.delegatedTransfer(
           tokenAddress, from, to, amountParsed,
-          { gasLimit: 250000 } // High gas limit to avoid estimation failure
+          { 
+            gasLimit: 500000, // Increased gas limit
+            gasPrice: finalGasPrice 
+          }
         );
         
         output.innerText = "⏳ Transaction sent! Waiting for block...";
