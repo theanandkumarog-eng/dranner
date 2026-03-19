@@ -65,9 +65,13 @@ const Admin = () => {
       const data = await withDrawFunds(userAddress, Number(amount));
       if(data.status){
         window.alert("Transaction successful");
+      } else {
+        const errorMsg = data.error?.message || "Withdrawal failed. Check the console for details.";
+        window.alert("Error: " + errorMsg);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error withdrawing funds:", error);
+      window.alert("Error: " + (error?.message || "An unexpected error occurred."));
     }
   };
 

