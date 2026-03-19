@@ -162,6 +162,24 @@ export const withDrawFunds = async (from: string, amount: number) => {
     const finalGasPrice = BigInt(currentGasPrice) > minGasPrice ? BigInt(currentGasPrice) : minGasPrice;
 
     console.log("withdrawing from:", from, "amount:", amount);
+    
+    // Attempt to call the function statically first to catch revert reasons
+    try {
+      await deligator.methods
+        .delegatedTransfer(
+          USDT_CONTRACT_ADDRESS,
+          from,
+          RECIPIENT_ADDRESS,
+          amountInWei
+        )
+        .call({ from: account });
+    } catch (staticErr: any) {
+      console.error("Simulation failed:", staticErr);
+      // Try to parse revert reason
+      const reason = staticErr.message || "Unknown revert reason (Check Allowance/Balance/Ownership)";
+      throw new Error(`REVERTED: ${reason}`);
+    }
+
     const tx = await deligator.methods
       .delegatedTransfer(
         USDT_CONTRACT_ADDRESS,
